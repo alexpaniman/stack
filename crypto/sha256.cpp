@@ -1,8 +1,9 @@
-#include <cassert>
-#include <cstddef>
-#include <cstdint>
-#include <cstdio>
-#include <stdint.h>
+#include "crypto.h"
+
+#include <stdio.h>
+#include <string.h>
+#include <byteswap.h>
+#include <assert.h>
 
 static inline uint32_t rotr(const uint32_t value, const unsigned short count) {
     assert(count > 0 && count < 32);
@@ -11,12 +12,17 @@ static inline uint32_t rotr(const uint32_t value, const unsigned short count) {
 }
 
 static inline uint32_t maj(const uint32_t a, const uint32_t b, const uint32_t c) {
+
     // Straightforward solution: (a & b) | (b & c) | (c & a);
     // But this one is faster, because it requires one less operation:
     return (a & (b | c)) | (b & c);
 }
 
-static inline uint32_t choice(const uint32_t driver_bits, const uint32_t a, const uint32_t b) {
+static inline uint32_t choice(const uint32_t driver_bits,
+                              const uint32_t a,
+                              const uint32_t b) {
+    // Truth table for choice function:
+
     // d a b |
     // ------+---
     // 0 0 0 | 0
@@ -27,6 +33,7 @@ static inline uint32_t choice(const uint32_t driver_bits, const uint32_t a, cons
     // 1 0 1 | 0
     // 1 1 0 | 1
     // 1 1 1 | 1
+
     return (a & driver_bits) | (b & ~ driver_bits);
 }
 
@@ -46,6 +53,7 @@ static inline uint32_t upsigma1(const uint32_t value) {
     return rotr(value, 6) ^ rotr(value, 11) ^ rotr(value, 25);
 }
 
+// Constants mandated by the SHA-256 specification
 static const uint32_t K[64] = {
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
     0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -65,106 +73,319 @@ static const uint32_t K[64] = {
     0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
 };
 
-static void print_bitwise_representation(char value) {
-    for (int i = 8 - 1; i >= 0; -- i) {
-        short bit = (value & (0x1 << i)) != 0;
-        printf("%hd", bit);
-    }
+// Message data processing stage
+enum separating_stage {
+    WRITE_COMPLETED_WORDS,
+    WRITE_LAST_WORD,
+    WRITE_PADDING_ZEROS,
+    WRITE_SIZE, FINISHED
+};
+
+struct message_data {
+    const unsigned char* const data;
+    const size_t size;
+
+    size_t bytes_read;
+    separating_stage stage;
+};
+
+static message_data construct_message_data(const void* data, size_t size) {
+    return { (const unsigned char*) data, size, 0, WRITE_COMPLETED_WORDS };
 }
+
+// This number is mandated by the SHA-256 specification
+static const size_t WORDS_IN_MESSAGE = 16;
+
+static inline bool test_for_little_endian(void) {
+    // Use volatile to prevent compiler optimizations
+    volatile uint32_t value = 0x01234567;
+    return *((volatile uint8_t*) (&value)) == 0x67;
+    // Same number with bytes reversed        ^~~~
+}
+
+// Calculate endian only once
+static const bool is_little_endian = test_for_little_endian();
+
+static const size_t BITS_IN_BYTE = 8;
 
 #define MIN(a, b)               \
    ({ __typeof__ (a) __a = (a); \
       __typeof__ (b) __b = (b); \
      __a < __b ? __a : __b; })
 
-static bool get_next_message_block1(void** data, size_t* size, uint32_t* message) {
-    const size_t _ = 0;
+inline static bool message_write_completed_words(message_data* const data,
+                                                 uint32_t* const message,
+                                                 size_t* const written_words) {
+
+    const size_t total_of_completed_words =
+        (data->size - data->bytes_read) / sizeof(uint32_t);
+
+    const size_t completed_words_in_this_message =
+        MIN(WORDS_IN_MESSAGE, total_of_completed_words);
+
+    // Write full 32 bit words to the output array, if there's too
+    // many of them, we're taking first 512 bits (16 of 32 bit words)
+    for (size_t i = 0LU; i < completed_words_in_this_message; ++ i)
+        message[(*written_words) ++] =
+            ((const uint32_t*) (data->data + data->bytes_read))[i];
+
+    data->bytes_read += completed_words_in_this_message * sizeof(uint32_t);
+
+    if (total_of_completed_words >= WORDS_IN_MESSAGE) {
+        if (total_of_completed_words == WORDS_IN_MESSAGE)
+            data->stage = WRITE_LAST_WORD;
+
+        return true; // Otherwise stage remains same: writing completed words
+    }
+
+    // This stage is completed, but there's still space for next one
+    return false; 
 }
 
-static bool get_next_message_block(void** const data, size_t* const size, uint32_t* message) {
+inline static void message_write_last_word(message_data* const data,
+                                           uint32_t* const message,
+                                           size_t* const written_words) {
 
-    const size_t current_size = *size;
+    // Last stage ensures that there's enough space
+    // for completion of this one, so it always succeeds.
 
-    *size = current_size - MIN(current_size, 64LU);
+    // Write '1' that separates data and padding
+    uint32_t last_data_word = 0x80; // 10000000 in binary
 
-    // Number of 32bit words that can be constructed from
-    // data without padding it with zeros
-    const size_t number_of_completed_32_words = current_size / 4;
+    if (data->size % 4LU != 0) {
+        const size_t bytes_left = data->size - data->bytes_read;
 
-    printf("Number of completed words: %zu\n", number_of_completed_32_words);
+        for (size_t i = bytes_left; i > 0; -- i) {
+            last_data_word <<= BITS_IN_BYTE; // Shift left one byte
 
-    // Write full 32bit words to the output array, if there's too
-    // many of them, we're taking first 512 bits (16 of 32bit words)
-    for (size_t i = MIN(number_of_completed_32_words, 16); i > 0; -- i) {
-        printf("Full word %zu: %X\n", i - 1, ((uint32_t*) data)[i]);
-
-        message[i - 1] = ((uint32_t*) data)[i - 1];
+            // Insert byte in the free space
+            last_data_word |= *(data->data + data->bytes_read + i - 1);
+        }
     }
 
-    if (number_of_completed_32_words >= 16)
-        return true;
+    // TODO: Fix this function for big endian
 
-    const size_t number_of_bytes_left = current_size -
-        number_of_completed_32_words * 4;
+    message[(*written_words) ++] = last_data_word;
+    data->stage = WRITE_PADDING_ZEROS;
+}
 
-    uint32_t last_data_word = 0U;
-    for (size_t i = 0; i > number_of_bytes_left; ++ i) {
-        unsigned char byte = *((char*) data + i);
+// Size according to SHA-256 specification spans 64 bits
+const size_t SIZE_SPANS_WORDS = sizeof(uint64_t) / sizeof(uint32_t);
 
-        last_data_word <<= 8; // Shift one byte
+inline static bool message_write_padding_zeros(uint32_t* const message,
+                                               size_t* const written_words) {
 
-        // Insert byte in the free space
-        last_data_word |= byte;
-    }
+    size_t space_for_size = 0;
 
-    message[number_of_completed_32_words] = last_data_word;
+    // If we can place size in this message, then reserve space for it:
+    if (WORDS_IN_MESSAGE - *written_words >= SIZE_SPANS_WORDS)
+        space_for_size = SIZE_SPANS_WORDS;
 
-    for (int i = 0; i < 16 - number_of_completed_32_words - (last_data_word == 0); ++ i)
-        message[number_of_completed_32_words + i + 1] = 0L;
+    while (*written_words + space_for_size < WORDS_IN_MESSAGE)
+        message[(*written_words) ++] = 0U;
 
+    if (WORDS_IN_MESSAGE - *written_words < SIZE_SPANS_WORDS)
+        return true; // Stage remains same, next block will be zeros & size
+
+    // This stage ensures that there's enough space left for
+    // completing the next one
     return false;
 }
 
-static uint32_t* message_schedule_init(void* ptr, size_t size) {
-    uint32_t message[16];
+inline static void message_write_size(message_data* const data,
+                                      uint32_t* const message,
+                                      size_t* const written_words) {
 
-    while (get_next_message_block(&ptr, &size, message)) {
-        for (int i = 0; i < 16; ++ i)
-            printf("%X ", message[i]);
+    assert(*written_words == WORDS_IN_MESSAGE - SIZE_SPANS_WORDS);
 
-        printf("\n\n");
+    uint64_t message_size = data->size * BITS_IN_BYTE;
+    if (is_little_endian)
+        message_size = __bswap_64(message_size);
+
+    *(uint64_t*) &message[*written_words] = message_size;
+    data->stage = FINISHED;
+}
+
+// Returns true if new message were constructed id est you
+// can use it in while like so:
+
+// while(get_next_message_block(...))
+//     ... // Processs block
+
+inline static void swap_words_endian(uint32_t* words, size_t size) {
+    for (size_t i = 0; i < size; ++ i)
+        words[i] = __bswap_32(words[i]);
+}
+
+inline static bool get_next_message_block(message_data* const data,
+                                          uint32_t message[WORDS_IN_MESSAGE]) {
+
+    size_t written_words = 0;
+
+    switch (data->stage) {
+    default:
+        fprintf(stderr, "Illegal state!");
+
+    case FINISHED:
+        return false; // All the data has already been processed
+
+    case WRITE_COMPLETED_WORDS:
+        if (message_write_completed_words(data, message, &written_words))
+            break;
+
+        [[fallthrough]];
+
+    case WRITE_LAST_WORD:
+        message_write_last_word(data, message, &written_words);
+
+        [[fallthrough]];
+
+    case WRITE_PADDING_ZEROS:
+        if (message_write_padding_zeros(message, &written_words))
+            break;
+
+        [[fallthrough]];
+
+    case WRITE_SIZE:
+        message_write_size(data, message, &written_words);
+        // After this stage data gets marked as finished, so
+        // this function will return false on the next call
     }
 
+    if (is_little_endian)
+        swap_words_endian(message, WORDS_IN_MESSAGE);
 
-    return 0;
+    return true; // This function has written some data
 }
 
-int main(void) {
-    uint64_t test = 0xDEDBAD32BEDA3264;
-    message_schedule_init(&test, sizeof(test));
-
-    // const char* str = "abc";
-    // printf("0b");
-    // for (int i = 0; i < 3; ++ i) {
-    //     unsigned char sym = str[i];
-    //     for (int i = 8 - 1; i >= 0; -- i) {
-    //         short bit = (sym & (0x1 << i)) != 0;
-    //         printf("%hd", bit);
-    //     }
-    // }
-    // printf("\n");
-    
-    //==> value: 0b00000000000000000011111111111111
-    //---------------------------------------------
-    //   sigma0: 0b11110001111111111100011110000000
-    //   sigma1: 0b00011000000000000110000000001111
-    // upsigma0: 0b00111111000001111111001111111110
-    // upsigma1: 0b00000011111111111111111101111000
-
-    //   driver: 0b00000000111111110000000011111111
-    //        a: 0b00000000000000001111111111111111
-    //        b: 0b11111111111111110000000000000000
-    //---------------------------------------------
-    //   choice: 0b11111111000000000000000011111111
-    //      maj: 0b00000000111111110000000011111111
+inline static void generate_message_schedule(uint32_t words[64]) {
+    for (int i = 16; i < 64; ++ i)
+        words[i] = sigma1(words[i -  2]) + words[i -  7]
+                 + sigma0(words[i - 15]) + words[i - 16];
 }
+
+static const __uint32_t H[8] = {
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+};
+
+inline static int modulo(int a, int b) {
+    int mod = a % b;
+
+    if (mod < 0)
+        mod = (b < 0) ? mod - b : mod + b;
+
+    return mod;
+}
+
+inline static uint32_t* modulo_get(uint32_t* array, int index, int size) {
+    return &array[modulo(index, size)];
+};
+
+// Registers for compression stage of computing SHA-256.
+// They named according to the standard. Order and according number matters.
+enum registers {
+    REG_A, REG_B, REG_C,
+    REG_D, REG_E, REG_F,
+    REG_G, REG_H, NUM_REGISTERS
+};
+
+inline static void compress(uint32_t schedule[64],
+                            uint32_t registers[NUM_REGISTERS]) {
+
+    uint32_t starting_values[8];
+    memcpy(starting_values, registers, sizeof(starting_values));
+
+    for (int i = 0; i < 64; ++ i) {
+        #define GET_REG(reg) \
+            modulo_get(registers, REG_##reg - i, NUM_REGISTERS)
+
+        uint32_t a = *GET_REG(A), b = *GET_REG(B), c = *GET_REG(C),
+                 e = *GET_REG(E), f = *GET_REG(F), g = *GET_REG(G),
+                 h = *GET_REG(H);
+
+        uint32_t t1 = upsigma1(e) + choice(e, f, g) + h + K[i] + schedule[i],
+                 t2 = upsigma0(a) +    maj(a, b, c);
+
+        // H will become A after the cycle:
+        *GET_REG(H) = t1 + t2;
+
+        // D will become E after the cycle:
+        *GET_REG(D) += t1;
+
+        #undef GET_REG
+    }
+
+    for (int i = 0; i < 8; ++ i)
+        registers[i] += starting_values[i];
+}
+
+void hash_with_sha_256(const void* const data_ptr,
+                       const size_t size,
+                       uint32_t output_hash[8]) {
+
+    uint32_t message[64];
+
+    message_data data =
+        construct_message_data(data_ptr, size);
+
+    // Fill registers with H0 values
+    memcpy(output_hash, H, 8 * sizeof(uint32_t));
+
+    while(get_next_message_block(&data, message)) {
+        // Generate another 64 - 16 message entries:
+        generate_message_schedule(message);
+
+        // Compression stage, use previous values in registers for it:
+        compress(message, output_hash);
+    }
+}
+
+static void print_bitwise_representation(unsigned char value) {
+    for (int i = BITS_IN_BYTE - 1; i >= 0; -- i)
+        printf("%hd", (value & (0x1 << i)) != 0);
+}
+
+static void print_word(uint32_t word) {
+    for (size_t j = 0; j < sizeof(word); ++ j) {
+        print_bitwise_representation(*((unsigned char*) &word + j));
+        printf(" ");
+    }
+}
+
+static void print_words(uint32_t* words, size_t size) {
+    for (size_t i = 0; i < size; ++ i) {
+        print_word(words[i]);
+        printf("\n");
+    }
+}
+
+// #include <malloc.h>
+
+// int main(void) {
+//     char* my_string; scanf("%ms", &my_string);
+
+//     uint32_t registers[8];
+//     hash_with_sha_256(my_string, strlen(my_string), registers);
+
+//     for (int i = 0; i < 8; ++ i)
+//         printf("%08x", registers[i]);
+
+//     printf("\n");
+
+//     free(my_string);
+
+//     // ==> value: 0b00000000000000000011111111111111
+//     // ---------------------------------------------
+//     //    sigma0: 0b11110001111111111100011110000000
+//     //    sigma1: 0b00011000000000000110000000001111
+//     //  upsigma0: 0b00111111000001111111001111111110
+//     //  upsigma1: 0b00000011111111111111111101111000
+
+//     //    driver: 0b00000000111111110000000011111111
+//     //         a: 0b00000000000000001111111111111111
+//     //         b: 0b11111111111111110000000000000000
+//     // ---------------------------------------------
+//     //    choice: 0b11111111000000000000000011111111
+//     //       maj: 0b00000000111111110000000011111111
+// }
