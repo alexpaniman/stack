@@ -5,17 +5,29 @@
 #include <cstdlib>
 
 stack_trace* __trace_create_success() {
-    stack_trace* new_trace = (stack_trace*)
-        calloc(1, sizeof(*new_trace));
+    // We only ever need single instance of
+    // success, because success has no cause
+    static stack_trace success_trace = {
+        .latest_error = { .error_code = SUCCESS },
+        .trace = NULL
+    };
 
-    new_trace->trace = NULL;
-    new_trace->latest_error = { .error_code = SUCCESS };
+    return &success_trace;
+}
 
-    return new_trace;
+int trace_error_code(stack_trace* trace) {
+    return trace->latest_error.error_code;
+}
+
+bool trace_is_success(stack_trace* trace) {
+    return trace_error_code(trace) == SUCCESS;
 }
 
 stack_trace* __trace_create_failure(stack_trace* cause, int code,
                                     const char* message, occurance occured) {
+
+    if (cause != NULL && trace_is_success(cause))
+        return FAILURE(LOGIC_ERROR, "Error can't be caused by success!");
 
     stack_trace* new_trace = (stack_trace*)
         calloc(1, sizeof(*new_trace));
@@ -28,14 +40,6 @@ stack_trace* __trace_create_failure(stack_trace* cause, int code,
     };
 
     return new_trace;
-}
-
-int trace_error_code(stack_trace* trace) {
-    return trace->latest_error.error_code;
-}
-
-bool trace_is_success(stack_trace* trace) {
-    return trace_error_code(trace) == SUCCESS;
 }
 
 static void __trace_print_description_indented(FILE* stream, const char* string,
@@ -56,7 +60,7 @@ static void __trace_print_description_indented(FILE* stream, const char* string,
 }
 
 static void __trace_print_occurance(FILE* stream, occurance* occurance) {
-    fprintf(stream, COLOR_BLUE "In %s:%d %s:\n" COLOR_RESET, occurance->file,
+    fprintf(stream, TEXT_INFO("In %s:%d %s:") "\n", occurance->file,
             occurance->line, occurance->function);
 }
 
@@ -66,12 +70,13 @@ void trace_print_stack_trace(FILE* stream, stack_trace* trace) {
 
     __trace_print_occurance(stream, &trace->latest_error.occured);
 
-    fprintf(stream, "==> " COLOR_RED "Error occured: \n" COLOR_RESET);
+    fprintf(stream, "==> " TEXT_ERROR("Error occured: ") "\n"
+            COLOR_WARNING /* Color for description */);
 
     __trace_print_description_indented(stream,
-        trace->latest_error.description, "    ");
+        trace->latest_error.description, TAB);
 
-    fprintf(stream, "\n");
+    fprintf(stream, COLOR_RESET "\n");
 
     int trace_depth = 1;
 
@@ -80,36 +85,40 @@ void trace_print_stack_trace(FILE* stream, stack_trace* trace) {
         if (trace_is_success(current_trace))
             break;
 
-        fprintf(stream, "    | " COLOR_BLUE "Depth %d" COLOR_RESET " | ", trace_depth ++);
+        fprintf(stream, TAB "| " TEXT_SUCCESS("Depth %d") " | ",
+                trace_depth ++);
 
         __trace_print_occurance(stream,
             &current_trace->latest_error.occured);
 
-        fprintf(stream, "    | ==> " COLOR_RED "Caused error:" COLOR_RESET " \n");
+        fprintf(stream, TAB "| ==> " TEXT_ERROR("Caused error:") " \n");
 
         __trace_print_description_indented(stream,
-            current_trace->latest_error.description, "    |    ");
+            current_trace->latest_error.description,
+            TAB COLOR_RESET "|" COLOR_WARNING TAB);
 
-        fprintf(stream, "\n");
+        fprintf(stream, COLOR_RESET "\n");
     }
 }
 
 void trace_destruct(stack_trace* trace) {
-    if (trace == NULL)
+    if (trace == NULL || trace == SUCCESS())
         return;
 
     trace_destruct(trace->trace);
     free(trace), trace = NULL;
 }
 
-int main(void) {
-    stack_trace* trace = FAILURE(RUNTIME_ERROR, "My error, everything is dead");
+// int main(void) {
+//     stack_trace* traced0 = FAILURE(RUNTIME_ERROR, "Fail!");
 
-    trace = PASS_FAILURE(trace, RUNTIME_ERROR, "Passed error");
+//     stack_trace* traced1 = PASS_FAILURE(traced0, RUNTIME_ERROR, "Fail!");
 
-    trace = PASS_FAILURE(trace, RUNTIME_ERROR, "Triple error");
+//     stack_trace* traced2 = PASS_FAILURE(traced1, RUNTIME_ERROR, "Fail!");
 
-    trace_print_stack_trace(stderr, trace);
+//     stack_trace* traced3 = PASS_FAILURE(traced2, RUNTIME_ERROR, "Fail!");
 
-    trace_destruct(trace);
-}
+//     trace_print_stack_trace(stderr, traced3);
+
+//     trace_destruct(traced3);
+// }

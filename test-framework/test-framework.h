@@ -33,7 +33,7 @@ static inline bool __test_framework_init_test_list() {
     const size_t initial_size = 2;
 
     state->tests = (__test_framework_entry*)
-        malloc(initial_size * sizeof(__test_framework_entry));
+        calloc(initial_size, sizeof(__test_framework_entry));
 
     state->used = 0;
     state->size = initial_size;
@@ -62,8 +62,10 @@ static inline bool __test_framework_add_test_entry(__test_framework_entry entry)
         __test_framework_entry *new_space = (__test_framework_entry*)
             realloc(state->tests, state->size * sizeof(__test_framework_entry));
 
-        if (new_space == NULL)
+        if (new_space == NULL) {
+            perror("Realloc");
             return false; // Reallocation failed
+        }
 
         state->tests = new_space;
     }
@@ -90,23 +92,7 @@ static inline void __test_framework_get_test_name_with_spaces(const char* const 
     }
 
     // Capitalize first character
-    new_name[0] = toupper(new_name[0]);
-}
-
-#define MAX(x, y)             \
-    ({ __typeof__(x) __x = x; \
-       __typeof__(y) __y = y; \
-       __x > __y ? __x : __y; \
-    })
-
-static inline int __test_framework_calculate_name_len() {
-    __test_framework_state *state = &__test_framework_current_state;
-
-    int size = 0;
-    for (int i = 0; i < state->used; ++ i)
-        size = MAX(size, strlen(state->running_test[state->used].test_name));
-
-    return size;
+    new_name[0] = (char) toupper(new_name[0]);
 }
 
 #define TEXT_RED    "\033[31m"
@@ -134,7 +120,7 @@ static inline int __test_framework_calculate_name_len() {
             printf("\n");                                                                    \
             printf(TEXT_FAILED("[==> FAILED! <==] Test \"%s\"") "\n", name_with_spaces);     \
                                                                                              \
-            printf("In " TEXT_WARNING("%s:%u\n"), __FILE__, __LINE__);                       \
+            printf("In " TEXT_WARNING("%s:%u") "\n", __FILE__, __LINE__);                    \
             printf("In check " TEXT_FAILED("%s") ":\n", #actual " == " #expected);           \
             printf("Expected: " TEXT_INFO(format) "\n", expected);                           \
             printf("  Actual: " TEXT_FAILED(format) "\n", actual);                           \
@@ -186,8 +172,8 @@ static inline void __test_framework_entry_print_testing_stats(size_t failed_test
 
         printf("\n");
 
-        const double passed_percent = passed_tests * 100.0 / (double) num_of_tests; 
-        const double failed_percent = failed_tests * 100.0 / (double) num_of_tests; 
+        const double passed_percent = (double) passed_tests * 100.0 / (double) num_of_tests; 
+        const double failed_percent = (double) failed_tests * 100.0 / (double) num_of_tests; 
 
         printf(" ==> Failed tests: " TEXT_FAILED("%zu") " " TEXT_INFO("%.0lf%%") "\n",
                failed_tests, failed_percent);
@@ -201,8 +187,8 @@ static inline void __test_framework_entry_print_testing_stats(size_t failed_test
         __test_framework_state *state = &__test_framework_current_state;                     \
         printf(TEXT_INFO("[==> MESSAGE <==] Running %zu tests") "\n", state->used);          \
                                                                                              \
-        int failed_tests = 0;                                                                \
-        for (int i = 0; i < state->used; ++ i) {                                             \
+        size_t failed_tests = 0;                                                             \
+        for (size_t i = 0; i < state->used; ++ i) {                                          \
             __test_framework_entry* entry = state->tests + i;                                \
                                                                                              \
             state->running_test = entry; /* Mark test running */                             \
@@ -213,11 +199,9 @@ static inline void __test_framework_entry_print_testing_stats(size_t failed_test
             char name_with_spaces[strlen(test_name) + 1];                                    \
             __test_framework_get_test_name_with_spaces(test_name, name_with_spaces);         \
                                                                                              \
-            if (state->status > 0) { /* TODO */                                              \
-                /* int length = __test_framework_calculate_name_len(); */                    \
+            if (state->status > 0)                                                           \
                 printf(TEXT_PASSED("[==> PASSED! <==]") " Test " TEXT_PASSED("\"%s\"") "\n", \
                        name_with_spaces);                                                    \
-            }                                                                                \
                                                                                              \
             if (state->status == 0)                                                          \
                 printf(TEXT_WARNING("[==> WARNING <==] Test \"%s\" asserts nothing") "\n",   \

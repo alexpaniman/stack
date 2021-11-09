@@ -5,10 +5,12 @@
 #include <byteswap.h>
 #include <assert.h>
 
-static inline uint32_t rotr(const uint32_t value, const unsigned short count) {
-    assert(count > 0 && count < 32);
+static const size_t BITS_IN_BYTE = 8;
 
-    return value >> count | value << (32 - count);
+static inline uint32_t rotr(const uint32_t value, const unsigned short count) {
+    assert(count > 0 && count < sizeof(int32_t) * BITS_IN_BYTE);
+
+    return value >> count | value << (sizeof(int32_t) * BITS_IN_BYTE - count);
 }
 
 static inline uint32_t maj(const uint32_t a, const uint32_t b, const uint32_t c) {
@@ -105,8 +107,6 @@ static inline bool test_for_little_endian(void) {
 
 // Calculate endian only once
 static const bool is_little_endian = test_for_little_endian();
-
-static const size_t BITS_IN_BYTE = 8;
 
 #define MIN(a, b)               \
    ({ __typeof__ (a) __a = (a); \
@@ -225,6 +225,8 @@ inline static bool get_next_message_block(message_data* const data,
     switch (data->stage) {
     default:
         fprintf(stderr, "Illegal state!");
+
+        [[fallthrough]];
 
     case FINISHED:
         return false; // All the data has already been processed
@@ -360,32 +362,32 @@ static void print_words(uint32_t* words, size_t size) {
     }
 }
 
-// #include <malloc.h>
+#include <malloc.h>
 
-// int main(void) {
-//     char* my_string; scanf("%ms", &my_string);
+int main(void) {
+    char* my_string; scanf("%ms", &my_string);
 
-//     uint32_t registers[8];
-//     hash_with_sha_256(my_string, strlen(my_string), registers);
+    uint32_t registers[8];
+    hash_with_sha_256(my_string, strlen(my_string), registers);
 
-//     for (int i = 0; i < 8; ++ i)
-//         printf("%08x", registers[i]);
+    for (int i = 0; i < 8; ++ i)
+        printf("%08x", registers[i]);
 
-//     printf("\n");
+    printf("\n");
 
-//     free(my_string);
+    free(my_string);
 
-//     // ==> value: 0b00000000000000000011111111111111
-//     // ---------------------------------------------
-//     //    sigma0: 0b11110001111111111100011110000000
-//     //    sigma1: 0b00011000000000000110000000001111
-//     //  upsigma0: 0b00111111000001111111001111111110
-//     //  upsigma1: 0b00000011111111111111111101111000
+    // ==> value: 0b00000000000000000011111111111111
+    // ---------------------------------------------
+    //    sigma0: 0b11110001111111111100011110000000
+    //    sigma1: 0b00011000000000000110000000001111
+    //  upsigma0: 0b00111111000001111111001111111110
+    //  upsigma1: 0b00000011111111111111111101111000
 
-//     //    driver: 0b00000000111111110000000011111111
-//     //         a: 0b00000000000000001111111111111111
-//     //         b: 0b11111111111111110000000000000000
-//     // ---------------------------------------------
-//     //    choice: 0b11111111000000000000000011111111
-//     //       maj: 0b00000000111111110000000011111111
-// }
+    //    driver: 0b00000000111111110000000011111111
+    //         a: 0b00000000000000001111111111111111
+    //         b: 0b11111111111111110000000000000000
+    // ---------------------------------------------
+    //    choice: 0b11111111000000000000000011111111
+    //       maj: 0b00000000111111110000000011111111
+}

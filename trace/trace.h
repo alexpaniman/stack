@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cstdio>
 #include <cstddef>
 
@@ -83,5 +85,3 @@ bool trace_is_success(stack_trace* trace);
 void trace_print_stack_trace(FILE* stream, stack_trace* trace);
 
 void trace_destruct(stack_trace* trace);
-
-

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cstdio>
 #include <cstdlib>
 #include <assert.h>
@@ -10,9 +12,9 @@ struct simple_stack {
     size_t next_index;
 };
 
-static inline const size_t init_nmemb = 10;
+static const size_t init_nmemb = 10;
 
-static inline const size_t grow_coefficient = 2.0;
+static const size_t grow_coefficient = 2.0;
 
 template <typename E>
 void simple_stack_create(simple_stack<E>* const stack) {
