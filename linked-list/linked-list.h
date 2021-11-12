@@ -56,26 +56,65 @@ stack_trace* linked_list_create(linked_list<E>* list, const size_t capacity) {
 }
 
 template <typename E>
+void print_text_dump(linked_list<E>* list) {
+    printf("+------------------------------+\n");
+    for (int i = 0; i < list->capacity + 1; ++ i) {
+        element<E>* elem = &list->elements[i];
+        printf("| %2d: (%02d) | (<-) %02d | (->) %02d | \n",
+               i, elem->element, elem->prev_index, elem->next_index);
+    }
+    printf("+------------------------------+\n");
+}
+
+template <typename E>
+static inline size_t get_index(linked_list<E>* list, size_t logic_index) {
+    return list->head + logic_index;
+}
+
+template <typename E>
 static inline int linearize_cmp(const void* first, const void* second) {
     const element<E> * first_element = (const element<E>*) first,
                      *second_element = (const element<E>*) second;
 
-    printf("~~~~> %d %d\n", first_element->element, second_element->element);
-
-    if ((first_element ->prev_index == -1) ^
-        (second_element->prev_index == -1))
-        return second_element->next_index < first_element->next_index;
-
-    return first_element->next_index < second_element->next_index;
+    return first_element->next_index > second_element->next_index;
 }
 
 template <typename E>
-stack_trace* linked_list_linearize(linked_list<E>* list) {
-    qsort(list->elements, list->capacity, sizeof(element<E>), linearize_cmp<E>);
+void linked_list_linearize(linked_list<E>* list) {
+    // Link elements via next_index in actual order
+    int count = 1; element<E>* current = &list->elements[list->head];
+    do {
+        const size_t next_index = current->next_index;
+        current->next_index = ++ count;
 
+        current = &list->elements[next_index];
+    } while (current->next_index != current->prev_index);
+
+    int index_before_free = count - 1;
+
+    // Link free space via next_index in actual order
+    current = &list->elements[list->free];
+    do {
+        const size_t next_index = current->next_index;
+        current->next_index = ++ count;
+
+        current = &list->elements[next_index];
+    } while (current->next_index != current->prev_index);
+
+    qsort(list->elements,
+          list->capacity + 1, sizeof(element<E>), linearize_cmp<E>);
+
+    // Disconnect list of elements from list of free
+    list->elements[index_before_free].next_index = 0;
+
+    // Fix ending of free list (disconnect from illegal node)
+    list->elements[count - 1].next_index = 0;
+
+    // Update head
     if (list->head != 0)
         list->head = 1;
 
+    // Link prev_index for all elements
     int previous = 0;
     for (int i = 1; i <= list->capacity; ++ i) {
         if (list->elements[i].prev_index == -1)
@@ -87,27 +126,17 @@ stack_trace* linked_list_linearize(linked_list<E>* list) {
 
     list->tail = previous;
 
-    int next = 0;
-    for (int i = list->capacity; i > 0; -- i) {
-        list->elements[i].next_index = next;
-        next = i;
-
-        if (list->elements[i].prev_index == -1)
-            list->free = i;
-    }
-
+    // Mark this list as linearized
     list->is_linearized = true;
-
-    return SUCCESS();
 }
 
 template <typename E>
 stack_trace* check_element(linked_list<E>* list, int index) {
     if (index > list->capacity)
-        return FAILURE(RUNTIME_ERROR, "Index overflows list capacity.");
+        return FAILURE(RUNTIME_ERROR, "Index overflows list capacity!");
 
     if (index < 0)
-        return FAILURE(RUNTIME_ERROR, "Index underflows list capacity.");
+        return FAILURE(RUNTIME_ERROR, "Index underflows list capacity!");
 
     element<E>* current = &list->elements[index];
 
@@ -124,7 +153,7 @@ stack_trace* linked_list_insert_after(linked_list<E>* list, E value,
     stack_trace* index_check = check_element(list, prev_index);
     if (!trace_is_success(index_check))
         return PASS_FAILURE(index_check, RUNTIME_ERROR,
-                            "Attempt to insert after illegal element.");
+                            "Attempt to insert after illegal element!");
 
     element<E>* elements = list->elements;
 
@@ -233,7 +262,7 @@ void linked_list_create_graph(FILE* file, linked_list<E>* list) {
     // for (int i = 1; i < (int) list->capacity; ++ i)
     //     fprintf(file, "\t\t node_%03d -> node_%03d;\n", i, i + 1);
 
-    fprintf(file, "\t\t edge [constraint = false, style = \"solid\"]; \n");
+    // fprintf(file, "\t\t edge [constraint = false, style = \"solid\"]; \n");
     for (int i = 1; i <= (int) list->capacity; ++ i) {
         const element<E>* el = &list->elements[i];
         if (el->next_index != 0)

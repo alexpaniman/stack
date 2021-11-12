@@ -44,9 +44,10 @@ TEST(test_linked_list) {
     simple_stack<frame_t> frames = frame_stack_create();
 
     for (int i = 0; i < 5; ++ i) {
+        frame(&list, &frames);
+
         if (i != 10)
             linked_list_insert(&list, i, NULL);
-
     }
 
     frame(&list, &frames);
@@ -55,8 +56,8 @@ TEST(test_linked_list) {
     trace_print_stack_trace(stdout, linked_list_insert_after(&list, 25, 2, &place2));
     frame(&list, &frames);
 
-    // trace_print_stack_trace(stdout, linked_list_linearize(&list));
-    // frame(&list, &frames);
+    linked_list_linearize(&list);
+    frame(&list, &frames);
 
     trace_print_stack_trace(stdout, linked_list_delete(&list, place2));
     frame(&list, &frames);
