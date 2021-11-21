@@ -131,12 +131,20 @@ static inline void __test_framework_get_test_name_with_spaces(const char* const 
         } else state->status = 1;                                                            \
     } while(false)
 
-#define ASSERT_EPSILON_EQUAL(actual, expected)                                               \
-    ASSERT_TRUE_WITH_EXPECTATION(                                                            \
-        __test_framework_assert_epsilon_equal(actual, expected), "%lf", actual, expected)
+#define ASSERT_EPSILON_EQUAL(actual, expected)                                                         \
+    do {                                                                                               \
+        __typeof__(  actual)   __actual =   actual;                                                    \
+        __typeof__(expected) __expected = expected;                                                    \
+        ASSERT_TRUE_WITH_EXPECTATION(                                                                  \
+            __test_framework_assert_epsilon_equal(__actual, __expected), "%lf", __actual, __expected); \
+    } while(false)
 
-#define ASSERT_EQUAL(actual, expected)                                                       \
-    ASSERT_TRUE_WITH_EXPECTATION(actual == expected, "%d", actual, expected)
+#define ASSERT_EQUAL(actual, expected)                                                                 \
+    do {                                                                                               \
+        __typeof__(  actual)   __actual =   actual;                                                    \
+        __typeof__(expected) __expected = expected;                                                    \
+        ASSERT_TRUE_WITH_EXPECTATION(__actual == __expected, "%d", __actual, __expected);              \
+    } while(false)
 
 #define TEST_FRAMEWORK_INITIALIZER(name)                                                     \
     static void __test_framework_initialize_##name() __attribute__((constructor));           \
