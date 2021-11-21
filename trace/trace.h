@@ -85,3 +85,21 @@ bool trace_is_success(stack_trace* trace);
 void trace_print_stack_trace(FILE* stream, stack_trace* trace);
 
 void trace_destruct(stack_trace* trace);
+
+#define TRY                                                     \
+    do {                                                        \
+        stack_trace* __trace = ({
+
+#define FAIL(error)                                             \
+        ;   });                                                 \
+        if (!trace_is_success(__trace))                         \
+            return PASS_FAILURE(__trace, RUNTIME_ERROR, error); \
+    } while(false)
+
+#define THROW(file)                                             \
+        ;   });                                                 \
+        if (!trace_is_success(__trace)) {                       \
+            trace_print_stack_trace(file, __trace);             \
+            abort();                                            \
+        }                                                       \
+    } while(false)
