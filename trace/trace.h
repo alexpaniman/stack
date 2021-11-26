@@ -117,9 +117,16 @@ extern thread_local jmp_buf finally_return_addr;
         longjmp(finally_return_addr, -1);                       \
     }
 
+void trace_call_finalizer(jmp_buf finalizer);
+
+#define CALL_FINALIZER(finalizer)                               \
+    do {                                                        \
+        trace_call_finalizer(finalizer_##finalizer);            \
+    } while(false)                                              \
+
+
 #define FINALIZE_AND_FAIL(finalizer, error)                     \
     CATCH({                                                     \
-        if (setjmp(finally_return_addr) == 0)                   \
-            longjmp(finalizer_##finalizer, -1);                 \
+        CALL_FINALIZER(finalizer);                              \
         return PASS_FAILURE(__trace, RUNTIME_ERROR, error);     \
     })

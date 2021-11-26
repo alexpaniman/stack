@@ -8,11 +8,22 @@
 #include <ctype.h>
 #include <math.h>
 #include <signal.h>
+#include <setjmp.h>
+
+#include "ansi-colors.h"
+#include "trace.h"
+
+struct __test_framework_test_finalizer {
+    bool is_initialized;
+    jmp_buf addr;
+};
 
 struct __test_framework_entry {
     const char* test_name;
     const char* file_name;
     int line_number;
+
+    __test_framework_test_finalizer finalizer;
 
     void (*test_function) ();
 };
@@ -99,18 +110,8 @@ inline void __test_framework_get_test_name_with_spaces(const char* const name,
     new_name[0] = (char) toupper(new_name[0]);
 }
 
-#define TEXT_RED    "\033[31m"
-#define TEXT_GREEN  "\033[32m"
-#define TEXT_YELLOW "\033[33m"
-#define TEXT_BLUE   "\033[35m"
-
-#define TEXT_BOLD   "\033[1m"
-#define TEXT_RESET  "\033[0m"
-
-#define TEXT_INFO(string)    TEXT_BOLD TEXT_BLUE   string TEXT_RESET
-#define TEXT_FAILED(string)  TEXT_BOLD TEXT_RED    string TEXT_RESET
-#define TEXT_WARNING(string) TEXT_BOLD TEXT_YELLOW string TEXT_RESET
-#define TEXT_PASSED(string)  TEXT_BOLD TEXT_GREEN  string TEXT_RESET
+#define TEXT_FAILED(str) TEXT_ERROR  (str)
+#define TEXT_PASSED(str) TEXT_SUCCESS(str)
 
 #define ASSERT_TRUE_WITH_EXPECTATION(cond, format, actual, expected)                         \
     do {                                                                                     \
@@ -121,13 +122,12 @@ inline void __test_framework_get_test_name_with_spaces(const char* const name,
             char name_with_spaces[strlen(test_name) + 1];                                    \
             __test_framework_get_test_name_with_spaces(test_name, name_with_spaces);         \
                                                                                              \
-            printf("\n");                                                                    \
-            printf(TEXT_FAILED("[==> FAILED! <==] Test \"%s\"") "\n", name_with_spaces);     \
+            printf("\n" TEXT_FAILED("[==> FAILED! <==] Test \"%s\"") "\n", name_with_spaces);\
                                                                                              \
-            printf("In " TEXT_WARNING("%s:%u") "\n", __FILE__, __LINE__);                    \
-            printf("In check " TEXT_FAILED("%s") ":\n", #actual " == " #expected);           \
-            printf("  Actual: " TEXT_FAILED(format) "\n", actual);                           \
-            printf("Expected: " TEXT_INFO(format) "\n", expected);                           \
+            printf("In "        TEXT_WARNING("%s:%u")  "\n", __FILE__, __LINE__);            \
+            printf("In check "  TEXT_FAILED ("%s"   ) ":\n", #actual " == " #expected);      \
+            printf("  Actual: " TEXT_FAILED (format )  "\n", actual);                        \
+            printf("Expected: " TEXT_INFO   (format )  "\n", expected);                      \
             printf("\n");                                                                    \
                                                                                              \
             state->status = -1;                                                              \
@@ -154,11 +154,23 @@ inline void __test_framework_get_test_name_with_spaces(const char* const name,
     static void __test_framework_initialize_##name() __attribute__((constructor));           \
     static void __test_framework_initialize_##name()
 
+#define TEST_FINALIZER(impl)                                                                 \
+    do {                                                                                     \
+        __test_framework_test_finalizer* finalizer =                                         \
+            &__test_framework_current_state.running_test->finalizer;                         \
+        finalizer->is_initialized = true;                                                    \
+                                                                                             \
+        if (setjmp(finalizer->addr) != 0) {                                                  \
+            impl                                                                             \
+            longjmp(finally_return_addr, -1);                                                \
+        }                                                                                    \
+    } while (false);
+
 #define TEST(name)                                                                           \
     void __test_framework_test_##name(void);                                                 \
     TEST_FRAMEWORK_INITIALIZER(name) {                                                       \
         __test_framework_entry entry {                                                       \
-            #name, __FILE__, __LINE__,                                                       \
+            #name, __FILE__, __LINE__, {},                                                   \
             &__test_framework_test_##name                                                    \
         };                                                                                   \
         __test_framework_add_test_entry(entry);                                              \
@@ -261,6 +273,11 @@ inline int test_framework_run_all_unit_tests(void) {
                                                                                             
         state->running_test = entry; // Mark test running
         run_and_catch_signals(entry->test_function); // Run test
+
+        __test_framework_test_finalizer* finalizer =
+            &__test_framework_current_state.running_test->finalizer;
+        if (finalizer->is_initialized)
+            trace_call_finalizer(finalizer->addr);
 
         char name_with_spaces[get_current_test_name(NULL) + 1];                                    
         get_current_test_name(name_with_spaces);

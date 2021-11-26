@@ -121,16 +121,7 @@ void trace_destruct(stack_trace* trace) {
 
 thread_local jmp_buf finally_return_addr = {};
 
-// int main(void) {
-//     stack_trace* traced0 = FAILURE(RUNTIME_ERROR, "Fail!");
-
-//     stack_trace* traced1 = PASS_FAILURE(traced0, RUNTIME_ERROR, "Fail!");
-
-//     stack_trace* traced2 = PASS_FAILURE(traced1, RUNTIME_ERROR, "Fail!");
-
-//     stack_trace* traced3 = PASS_FAILURE(traced2, RUNTIME_ERROR, "Fail!");
-
-//     trace_print_stack_trace(stderr, traced3);
-
-//     trace_destruct(traced3);
-// }
+void trace_call_finalizer(jmp_buf finalizer) {
+    if (setjmp(finally_return_addr) == 0)
+        longjmp(finalizer, -1);
+}
