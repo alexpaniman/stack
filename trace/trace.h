@@ -2,6 +2,8 @@
 
 #include <cstdio>
 #include <cstddef>
+#include <setjmp.h>
+#include <errno.h>
 
 /**
  * Error codes meant primarily for #error.
@@ -84,22 +86,40 @@ bool trace_is_success(stack_trace* trace);
 
 void trace_print_stack_trace(FILE* stream, stack_trace* trace);
 
+void trace_throw(FILE* file, stack_trace* trace);
+
 void trace_destruct(stack_trace* trace);
+
 
 #define TRY                                                     \
     do {                                                        \
         stack_trace* __trace = ({
 
-#define FAIL(error)                                             \
-        ;   });                                                 \
-        if (!trace_is_success(__trace))                         \
-            return PASS_FAILURE(__trace, RUNTIME_ERROR, error); \
-    } while(false)
-
-#define THROW(file)                                             \
+#define CATCH(impl)                                             \
         ;   });                                                 \
         if (!trace_is_success(__trace)) {                       \
-            trace_print_stack_trace(file, __trace);             \
-            abort();                                            \
+            impl                                                \
         }                                                       \
     } while(false)
+
+#define FAIL(error)                                             \
+    CATCH({                                                     \
+        return PASS_FAILURE(__trace, RUNTIME_ERROR, error);     \
+    })                                                          \
+
+
+extern thread_local jmp_buf finally_return_addr;
+
+#define FINALIZER(name, impl)                                   \
+    jmp_buf finalizer_##name = {};                              \
+    if (setjmp(finalizer_##name) != 0) {                        \
+        impl                                                    \
+        longjmp(finally_return_addr, -1);                       \
+    }
+
+#define FINALIZE_AND_FAIL(finalizer, error)                     \
+    CATCH({                                                     \
+        if (setjmp(finally_return_addr) == 0)                   \
+            longjmp(finalizer_##finalizer, -1);                 \
+        return PASS_FAILURE(__trace, RUNTIME_ERROR, error);     \
+    })

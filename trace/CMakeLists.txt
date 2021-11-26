@@ -6,3 +6,5 @@ target_include_directories(
 
 target_link_libraries(
   trace PUBLIC ansi-colors)
+
+add_unit_test(trace-test trace trace-tests.cpp)
