@@ -1,9 +1,13 @@
+#pragma once
+
+#include <csetjmp>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
+#include <signal.h>
 
 struct __test_framework_entry {
     const char* test_name;
@@ -27,7 +31,7 @@ struct __test_framework_state {
 
 static __test_framework_state __test_framework_current_state { NULL, 0, 0, 0, NULL };
 
-static inline bool __test_framework_init_test_list() {
+inline bool __test_framework_init_test_list() {
     __test_framework_state *state = &__test_framework_current_state;
 
     const size_t initial_size = 2;
@@ -41,7 +45,7 @@ static inline bool __test_framework_init_test_list() {
     return true;
 }
 
-static inline void __test_framework_free_test_list() {
+inline void __test_framework_free_test_list() {
     __test_framework_state *state = &__test_framework_current_state;
 
     free(state->tests);
@@ -51,7 +55,7 @@ static inline void __test_framework_free_test_list() {
     state->size = 0;
 }
 
-static inline bool __test_framework_add_test_entry(__test_framework_entry entry) {
+inline bool __test_framework_add_test_entry(__test_framework_entry entry) {
     if (__test_framework_current_state.tests == NULL)
         __test_framework_init_test_list();
 
@@ -74,12 +78,12 @@ static inline bool __test_framework_add_test_entry(__test_framework_entry entry)
     return true; // Finished successfully
 }
 
-static inline bool __test_framework_assert_epsilon_equal(double x, double y) {
+inline bool __test_framework_assert_epsilon_equal(double x, double y) {
     return fabs(x - y) <= 1e-9 /* EPSILON */;
 }
 
-static inline void __test_framework_get_test_name_with_spaces(const char* const name,
-                                                              char* const new_name) {
+inline void __test_framework_get_test_name_with_spaces(const char* const name,
+                                                       char* const new_name) {
     for (int i = 0; true; ++ i) {
         char symbol = name[i];
         new_name[i] = symbol;
@@ -122,8 +126,8 @@ static inline void __test_framework_get_test_name_with_spaces(const char* const 
                                                                                              \
             printf("In " TEXT_WARNING("%s:%u") "\n", __FILE__, __LINE__);                    \
             printf("In check " TEXT_FAILED("%s") ":\n", #actual " == " #expected);           \
-            printf("Expected: " TEXT_INFO(format) "\n", expected);                           \
             printf("  Actual: " TEXT_FAILED(format) "\n", actual);                           \
+            printf("Expected: " TEXT_INFO(format) "\n", expected);                           \
             printf("\n");                                                                    \
                                                                                              \
             state->status = -1;                                                              \
@@ -161,68 +165,128 @@ static inline void __test_framework_get_test_name_with_spaces(const char* const 
     }                                                                                        \
     void __test_framework_test_##name(void)                                                  \
 
-static inline void __test_framework_entry_print_testing_stats(size_t failed_tests) {
-        size_t num_of_tests = __test_framework_current_state.used;
+inline void __test_framework_entry_print_testing_stats(size_t failed_tests) {
+    size_t num_of_tests = __test_framework_current_state.used;
 
-        const size_t passed_tests = num_of_tests - failed_tests;
+    const size_t passed_tests = num_of_tests - failed_tests;
 
-        printf(TEXT_INFO("[==>  STATS  <==]") " ");
+    printf(TEXT_INFO("[==>  STATS  <==]") " ");
 
-        const size_t graph_length = 63;
-        const size_t failed_graph_length = failed_tests * graph_length / num_of_tests;
-        const size_t passed_graph_length = graph_length - failed_graph_length;
+    const size_t graph_length = 63;
+    const size_t failed_graph_length = failed_tests * graph_length / num_of_tests;
+    const size_t passed_graph_length = graph_length - failed_graph_length;
 
-        for (size_t i = 0; i < failed_graph_length; ++ i)
-            printf(TEXT_FAILED("*"));
+    for (size_t i = 0; i < failed_graph_length; ++ i)
+        printf(TEXT_FAILED("*"));
 
-        for (size_t i = 0; i < passed_graph_length; ++ i)
-            printf(TEXT_PASSED("*"));
+    for (size_t i = 0; i < passed_graph_length; ++ i)
+        printf(TEXT_PASSED("*"));
 
-        printf("\n");
+    printf("\n");
 
-        const double passed_percent = (double) passed_tests * 100.0 / (double) num_of_tests; 
-        const double failed_percent = (double) failed_tests * 100.0 / (double) num_of_tests; 
+    const double passed_percent = (double) passed_tests * 100.0 / (double) num_of_tests; 
+    const double failed_percent = (double) failed_tests * 100.0 / (double) num_of_tests; 
 
-        printf(" ==> Failed tests: " TEXT_FAILED("%zu") " " TEXT_INFO("%.0lf%%") "\n",
-               failed_tests, failed_percent);
+    printf(" ==> Failed tests: " TEXT_FAILED("%zu") " " TEXT_INFO("%.0lf%%") "\n",
+            failed_tests, failed_percent);
 
-        printf(" ==> Passed tests: " TEXT_PASSED("%zu") " " TEXT_INFO("%.0lf%%") "\n",
-               passed_tests, passed_percent);
+    printf(" ==> Passed tests: " TEXT_PASSED("%zu") " " TEXT_INFO("%.0lf%%") "\n",
+            passed_tests, passed_percent);
 }
 
-#define TEST_MAIN()                                                                          \
-    int main(void) {                                                                         \
-        __test_framework_state *state = &__test_framework_current_state;                     \
-        printf(TEXT_INFO("[==> MESSAGE <==] Running %zu tests") "\n", state->used);          \
-                                                                                             \
-        size_t failed_tests = 0;                                                             \
-        for (size_t i = 0; i < state->used; ++ i) {                                          \
-            __test_framework_entry* entry = state->tests + i;                                \
-                                                                                             \
-            state->running_test = entry; /* Mark test running */                             \
-            entry->test_function();      /* Run test */                                      \
-                                                                                             \
-            const char* test_name = entry->test_name;                                        \
-                                                                                             \
-            char name_with_spaces[strlen(test_name) + 1];                                    \
-            __test_framework_get_test_name_with_spaces(test_name, name_with_spaces);         \
-                                                                                             \
-            if (state->status > 0)                                                           \
-                printf(TEXT_PASSED("[==> PASSED! <==]") " Test " TEXT_PASSED("\"%s\"") "\n", \
-                       name_with_spaces);                                                    \
-                                                                                             \
-            if (state->status == 0)                                                          \
-                printf(TEXT_WARNING("[==> WARNING <==] Test \"%s\" asserts nothing") "\n",   \
-                       name_with_spaces);                                                    \
-                                                                                             \
-            if (state->status < 0)                                                           \
-                ++ failed_tests;                                                             \
-                                                                                             \
-            state->status = 0;                                                               \
-        }                                                                                    \
-                                                                                             \
-        __test_framework_entry_print_testing_stats(failed_tests);                            \
-                                                                                             \
-        __test_framework_free_test_list();                                                   \
-        return 0;                                                                            \
+inline size_t get_current_test_name(char* name_with_spaces) {
+    const char* name_without_spaces =
+        __test_framework_current_state.running_test->test_name;
+
+    if (name_with_spaces != NULL)
+        __test_framework_get_test_name_with_spaces(name_without_spaces,
+                                                   name_with_spaces);         
+
+    return strlen(name_without_spaces);
+}
+
+inline jmp_buf* sigabrt_return_addr_ptr(void) {
+    static thread_local jmp_buf sigabrt_return_addr;
+    return &sigabrt_return_addr;
+}
+
+inline void catch_sigabrt(int signum) {
+    signal(signum, SIG_DFL);
+
+    size_t length = get_current_test_name(NULL);
+    char name[length + 1];
+    get_current_test_name(name);
+
+    printf(TEXT_FAILED("[==> FAILED! <==] Test \"%s\" sigaborted!") "\n", name);
+    __test_framework_current_state.status = -1;
+
+    longjmp(*sigabrt_return_addr_ptr(), -1);
+}
+
+inline void catch_sigsegv(int signum) {
+    signal(signum, SIG_DFL);
+
+    size_t length = get_current_test_name(NULL);
+    char name[length + 1];
+    get_current_test_name(name);
+
+    printf(TEXT_FAILED("[==> FAILED! <==] Test \"%s\" segfaulted!") "\n", name);
+    __test_framework_current_state.status = -1;
+
+    longjmp(*sigabrt_return_addr_ptr(), -1);
+}
+
+inline bool run_and_catch_signals(void (*func)(void)) {
+    if (setjmp(*sigabrt_return_addr_ptr()) == 0) {
+        signal(SIGABRT, &catch_sigabrt);
+        signal(SIGSEGV, &catch_sigsegv);
+        (*func)();
+        signal(SIGABRT, SIG_DFL);
+        signal(SIGSEGV, SIG_DFL);
+        return false;
+    }
+
+    return true;
+}
+
+inline int test_framework_run_all_unit_tests(void) {
+    setvbuf(stdout, NULL, _IONBF, 0);
+
+    __test_framework_state *state = &__test_framework_current_state;                     
+    printf(TEXT_INFO("[==> MESSAGE <==] Running %zu tests") "\n", state->used);          
+                                                                                            
+    size_t failed_tests = 0;                                                             
+    for (size_t i = 0; i < state->used; ++ i) {                                          
+        __test_framework_entry* entry = state->tests + i;                                
+                                                                                            
+        state->running_test = entry; // Mark test running
+        run_and_catch_signals(entry->test_function); // Run test
+
+        char name_with_spaces[get_current_test_name(NULL) + 1];                                    
+        get_current_test_name(name_with_spaces);
+                                                                                            
+        if (state->status > 0)                                                           
+            printf(TEXT_PASSED("[==> PASSED! <==]") " Test " TEXT_PASSED("\"%s\"") "\n", 
+                    name_with_spaces);                                                    
+                                                                                            
+        if (state->status == 0)                                                          
+            printf(TEXT_WARNING("[==> WARNING <==] Test \"%s\" asserts nothing") "\n",   
+                    name_with_spaces);                                                    
+                                                                                            
+        if (state->status < 0)                                                           
+            ++ failed_tests;                                                             
+                                                                                            
+        state->status = 0;                                                               
+    }                                                                                    
+                                                                                            
+    __test_framework_entry_print_testing_stats(failed_tests);                            
+                                                                                            
+    __test_framework_free_test_list();                                                   
+
+    return (int) failed_tests;
+}
+
+#define TEST_MAIN()                            \
+    int main(void) {                           \
+        test_framework_run_all_unit_tests();   \
     }
