@@ -72,6 +72,9 @@ add_subdirectory(protected-stack)
 # Fully featured doubly linked list in array
 add_subdirectory(linked-list)
 
+# Simple binary tree for use in akinator
+add_subdirectory(binary-tree)
+
 # ----------------------------- MAIN EXECUTABLE -----------------------------
 
 add_executable(stack main.cpp)
