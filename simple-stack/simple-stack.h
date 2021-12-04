@@ -61,6 +61,15 @@ E simple_stack_pop(simple_stack<E>* const stack) {
 }
 
 template <typename E>
+void simple_stack_reverse(simple_stack<E>* const stack) {
+    for (int low = 0, high = stack->next_index - 1; low < high; low++, high--) {
+        E temp                = stack->elements[ low];
+        stack->elements[ low] = stack->elements[high];
+        stack->elements[high] = temp;
+    }
+}
+
+template <typename E>
 void simple_stack_destruct(simple_stack<E>* const stack) {
     free(stack->elements);
     stack->length = stack->next_index = 0;
