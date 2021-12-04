@@ -75,6 +75,9 @@ add_subdirectory(linked-list)
 # Simple binary tree for use in akinator
 add_subdirectory(binary-tree)
 
+# Safe alternatives to alloc function family, that uses trace
+add_subdirectory(safe-alloc)
+
 # ----------------------------- MAIN EXECUTABLE -----------------------------
 
 add_executable(stack main.cpp)
