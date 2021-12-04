@@ -75,6 +75,9 @@ add_subdirectory(linked-list)
 # Simple binary tree for use in akinator
 add_subdirectory(binary-tree)
 
+# Fast hash table implementation, that depends on list
+add_subdirectory(hash-table)
+
 # Safe alternatives to alloc function family, that uses trace
 add_subdirectory(safe-alloc)
 
