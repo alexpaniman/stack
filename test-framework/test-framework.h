@@ -113,6 +113,15 @@ inline void __test_framework_get_test_name_with_spaces(const char* const name,
 #define TEXT_FAILED(str) TEXT_ERROR  (str)
 #define TEXT_PASSED(str) TEXT_SUCCESS(str)
 
+#define CALL_TEST_FINALIZER()                                                                \
+    do {                                                                                     \
+        __test_framework_test_finalizer* finalizer_current =                                 \
+            &__test_framework_current_state.running_test->finalizer;                         \
+                                                                                             \
+        if (finalizer_current->is_initialized)                                               \
+            CALL_FINALIZER(current->addr);                                                   \
+    } while(false);
+
 #define ASSERT_TRUE_WITH_EXPECTATION(cond, format, actual, expected)                         \
     do {                                                                                     \
         __test_framework_state *state = &__test_framework_current_state;                     \
@@ -131,6 +140,7 @@ inline void __test_framework_get_test_name_with_spaces(const char* const name,
             printf("\n");                                                                    \
                                                                                              \
             state->status = -1;                                                              \
+            CALL_TEST_FINALIZER();                                                           \
             return;                                                                          \
         } else state->status = 1;                                                            \
     } while(false)
@@ -149,6 +159,22 @@ inline void __test_framework_get_test_name_with_spaces(const char* const name,
         __typeof__(expected) __expected = expected;                                                    \
         ASSERT_TRUE_WITH_EXPECTATION(__actual == __expected, "%d", __actual, __expected);              \
     } while(false)
+
+#define ASSERT_SUCCESS() CATCH({                                                             \
+        __test_framework_state *state = &__test_framework_current_state;                     \
+        const char* test_name = state->running_test->test_name;                              \
+                                                                                             \
+        char name_with_spaces[strlen(test_name) + 1];                                        \
+        __test_framework_get_test_name_with_spaces(test_name, name_with_spaces);             \
+                                                                                             \
+        printf("\n"  TEXT_FAILED("[==> FAILED! <==] Test \"%s\"") "\n", name_with_spaces);   \
+        trace_print_stack_trace(stdout, PASS_FAILURE(__trace, RUNTIME_ERROR,                 \
+                            "Function execution was asserted to be successful!"));           \
+        trace_destruct(__trace);                                                             \
+        state->status = -1;                                                                  \
+        CALL_TEST_FINALIZER();                                                               \
+        return;                                                                              \
+    })
 
 #define TEST_FRAMEWORK_INITIALIZER(name)                                                     \
     static void __test_framework_initialize_##name() __attribute__((constructor));           \
@@ -273,11 +299,6 @@ inline int test_framework_run_all_unit_tests(void) {
                                                                                             
         state->running_test = entry; // Mark test running
         run_and_catch_signals(entry->test_function); // Run test
-
-        __test_framework_test_finalizer* finalizer =
-            &__test_framework_current_state.running_test->finalizer;
-        if (finalizer->is_initialized)
-            trace_call_finalizer(finalizer->addr);
 
         char name_with_spaces[get_current_test_name(NULL) + 1];                                    
         get_current_test_name(name_with_spaces);

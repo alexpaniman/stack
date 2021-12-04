@@ -5,5 +5,5 @@ add_library(test-framework STATIC
 
 target_link_libraries(test-framework PUBLIC ansi-colors simple-stack trace)
 
-target_include_directories(test-framework SYSTEM INTERFACE
+target_include_directories(test-framework PUBLIC
                            ${CMAKE_CURRENT_SOURCE_DIR})
