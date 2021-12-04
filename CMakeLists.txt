@@ -67,9 +67,9 @@ add_subdirectory(pseudographics)
 add_subdirectory(protected-stack)
 
 # Processor
-add_subdirectory(processor)
+# add_subdirectory(processor)
 
-# Linked list
+# Fully featured doubly linked list in array
 add_subdirectory(linked-list)
 
 # ----------------------------- MAIN EXECUTABLE -----------------------------

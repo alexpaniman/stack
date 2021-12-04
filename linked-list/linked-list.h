@@ -39,9 +39,11 @@ inline element<E>* linked_list_prev(linked_list<E>* list, element<E>* current) {
     return &list->elements[current->prev_index];
 }
 
+const element_index_t linked_list_end_index = 0;
+
 template <typename E>
 inline element<E>* linked_list_end(linked_list<E>* list) {
-    return &list->elements[0];
+    return &list->elements[linked_list_end_index];
 }
 
 
@@ -259,7 +261,7 @@ inline stack_trace* linked_list_push_front(linked_list<E>* list, E element,
                                            element_index_t* actual_index = NULL) {
 
     // Inserting before head will result in pushing element to front
-    return linked_list_insert_after(list, element, 0, actual_index);
+    return linked_list_insert_after(list, element, linked_list_end_index, actual_index);
 }
 
 template <typename E>
