@@ -64,7 +64,7 @@ struct stack_trace {
 
 stack_trace* __trace_create_success();
 stack_trace* __trace_create_failure(stack_trace* cause,
-    int code, const char* message, occurance occured);
+    int code, occurance occured, const char* message, ...);
 
 
 #define __TRACE_CREATE_OCCURANCE()         \
@@ -75,11 +75,11 @@ stack_trace* __trace_create_failure(stack_trace* cause,
 
 #define SUCCESS() __trace_create_success()
 
-#define FAILURE(            code, message) \
-    __trace_create_failure( NULL, code, message, __TRACE_CREATE_OCCURANCE())
+#define FAILURE(            code, ...)                                         \
+    __trace_create_failure( NULL, code, __TRACE_CREATE_OCCURANCE(), __VA_ARGS__)
 
-#define PASS_FAILURE(cause, code, message) \
-    __trace_create_failure(cause, code, message, __TRACE_CREATE_OCCURANCE())
+#define PASS_FAILURE(cause, code, ...)                                         \
+    __trace_create_failure(cause, code, __TRACE_CREATE_OCCURANCE(), __VA_ARGS__)
 
 
 bool trace_is_success(stack_trace* trace);
@@ -91,42 +91,41 @@ void trace_throw(FILE* file, stack_trace* trace);
 void trace_destruct(stack_trace* trace);
 
 
-#define TRY                                                     \
-    do {                                                        \
+#define TRY                                                       \
+    do {                                                          \
         stack_trace* __trace = ({
 
-#define CATCH(impl)                                             \
-        ;   });                                                 \
-        if (!trace_is_success(__trace)) {                       \
-            impl                                                \
-        }                                                       \
+#define CATCH(impl)                                               \
+        ;   });                                                   \
+        if (!trace_is_success(__trace)) {                         \
+            impl                                                  \
+        }                                                         \
     } while(false)
 
-#define FAIL(error)                                             \
-    CATCH({                                                     \
-        return PASS_FAILURE(__trace, RUNTIME_ERROR, error);     \
-    })                                                          \
+#define FAIL(...)                                                 \
+    CATCH({                                                       \
+        return PASS_FAILURE(__trace, RUNTIME_ERROR, __VA_ARGS__); \
+    })                                                            \
 
 
 extern thread_local jmp_buf finally_return_addr;
 
-#define FINALIZER(name, impl)                                   \
-    jmp_buf finalizer_##name = {};                              \
-    if (setjmp(finalizer_##name) != 0) {                        \
-        impl                                                    \
-        longjmp(finally_return_addr, -1);                       \
+#define FINALIZER(name, impl)                                     \
+    jmp_buf finalizer_##name = {};                                \
+    if (setjmp(finalizer_##name) != 0) {                          \
+        impl                                                      \
+        longjmp(finally_return_addr, -1);                         \
     }
 
-void trace_call_finalizer(jmp_buf finalizer);
+#define CALL_FINALIZER(finalizer)                                 \
+    do {                                                          \
+        if (setjmp(finally_return_addr) == 0)                     \
+            longjmp(finalizer_##finalizer, -1);                   \
+    } while(false)                                                \
 
-#define CALL_FINALIZER(finalizer)                               \
-    do {                                                        \
-        trace_call_finalizer(finalizer_##finalizer);            \
-    } while(false)                                              \
 
-
-#define FINALIZE_AND_FAIL(finalizer, error)                     \
-    CATCH({                                                     \
-        CALL_FINALIZER(finalizer);                              \
-        return PASS_FAILURE(__trace, RUNTIME_ERROR, error);     \
+#define FINALIZE_AND_FAIL(finalizer, ...)                         \
+    CATCH({                                                       \
+        CALL_FINALIZER(finalizer);                                \
+        return PASS_FAILURE(__trace, RUNTIME_ERROR, __VA_ARGS__); \
     })
