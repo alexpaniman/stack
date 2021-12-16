@@ -44,9 +44,9 @@ struct occurance {
  * @note There's error code #SUCCESS
  */
 struct error {
-    int error_code;           //!< Error code from #error_codes or extended from it enum
+    int error_code;    //!< Error code from #error_codes or extended from it enum
 
-    const char* description;  //!< Error description in english
+    char* description; //!< Error description in english
     occurance occured;
 };
 
@@ -86,8 +86,6 @@ bool trace_is_success(stack_trace* trace);
 
 void trace_print_stack_trace(FILE* stream, stack_trace* trace);
 
-void trace_throw(FILE* file, stack_trace* trace);
-
 void trace_destruct(stack_trace* trace);
 
 
@@ -106,6 +104,18 @@ void trace_destruct(stack_trace* trace);
     CATCH({                                                       \
         return PASS_FAILURE(__trace, RUNTIME_ERROR, __VA_ARGS__); \
     })                                                            \
+
+#define THROW(...)                                                \
+    CATCH({                                                       \
+        stack_trace* __current_trace =                            \
+            PASS_FAILURE(__trace, RUNTIME_ERROR, __VA_ARGS__);    \
+                                                                  \
+        trace_print_stack_trace(stderr, __current_trace);         \
+        /* Free memory before aborting! */                        \
+        trace_destruct(__current_trace);                          \
+        /* This should be avoided in favour of FAIL */            \
+        abort(); /* Dangerous way of handling errors */           \
+    })
 
 
 extern thread_local jmp_buf finally_return_addr;

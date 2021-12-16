@@ -183,16 +183,6 @@ void trace_print_stack_trace(FILE* stream, stack_trace* trace) {
     }
 }
 
-void trace_throw(FILE* stream, stack_trace* trace) {
-    const bool is_success = trace_is_success(trace);
-
-    trace_print_stack_trace(stream, trace);
-    trace_destruct(trace);
-
-    if (!is_success)
-        abort(); // Use only for testing purposes
-}
-
 void trace_destruct(stack_trace* trace) {
     if (trace == NULL || trace == SUCCESS())
         return;
