@@ -75,6 +75,9 @@ add_subdirectory(linked-list)
 # Simple binary tree for use in akinator
 add_subdirectory(binary-tree)
 
+# Binary-tree based akinator
+add_subdirectory(akinator)
+
 # Library for text processing derived from onegin
 add_subdirectory(textlib)
 
