@@ -87,6 +87,9 @@ add_subdirectory(safe-alloc)
 # Library for graph visualization
 add_subdirectory(graphviz)
 
+# Macro helper
+add_subdirectory(macro-utils)
+
 # ----------------------------- MAIN EXECUTABLE -----------------------------
 
 add_executable(stack main.cpp)

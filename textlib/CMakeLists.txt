@@ -1,4 +1,4 @@
-add_library(textlib STATIC textlib.cpp)
+add_library(textlib STATIC textlib.cpp printf-utils.cpp)
 
 target_include_directories(
   textlib SYSTEM INTERFACE
