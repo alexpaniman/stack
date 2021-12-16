@@ -78,6 +78,9 @@ add_subdirectory(binary-tree)
 # Binary-tree based akinator
 add_subdirectory(akinator)
 
+# Lexer for use in processor & akinator
+add_subdirectory(lexer)
+
 # Library for text processing derived from onegin
 add_subdirectory(textlib)
 
