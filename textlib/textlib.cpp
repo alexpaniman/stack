@@ -156,6 +156,6 @@ stack_trace* get_text(const char* const file_name, text* txt) {
 }
 
 void text_destruct(text* txt) {
-    free(txt->buffer);
-    free(txt->lines);
+    free(txt->buffer), txt->buffer = NULL;
+    free(txt->lines ), txt->lines  = NULL;
 }
