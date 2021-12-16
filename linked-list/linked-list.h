@@ -116,11 +116,13 @@ stack_trace* linked_list_create(linked_list<E>* list, const size_t capacity) {
 template <typename E>
 static inline
 stack_trace* check_index(linked_list<E>* list, element_index_t index) {
-    if (index > (element_index_t) list->capacity)
-        return FAILURE(RUNTIME_ERROR, "Index overflows list capacity!");
+    if (index > (element_index_t) list->capacity + 1)
+        return FAILURE(RUNTIME_ERROR, "Index %d overflows list capacity %d!",
+                       index, list->capacity);
 
     if (index < 0)
-        return FAILURE(RUNTIME_ERROR, "Index underflows list capacity!");
+        return FAILURE(RUNTIME_ERROR, "Index %d underflows list capacity %d!",
+                       index, list->capacity);
 
     return SUCCESS();
 }
@@ -157,7 +159,7 @@ stack_trace* get_free_element_on_place(linked_list<E>* list,
                                        element_index_t place_index) {
 
     if (!is_free_element(list, place_index))
-        return FAILURE(RUNTIME_ERROR, "Element isn't free!");
+        return FAILURE(RUNTIME_ERROR, "Element %d isn't free!", place_index);
 
     const element_index_t next =
         list->elements[place_index].next_index;
@@ -165,7 +167,8 @@ stack_trace* get_free_element_on_place(linked_list<E>* list,
     if (next == place_index)
         return FAILURE(RUNTIME_ERROR, "There's no free elements left!");
 
-    linked_list_unlink(list, place_index);
+    TRY linked_list_unlink(list, place_index)
+        FAIL("Failed to unlink element on place %d!", place_index);
 
     list->free = next; // This way we won't have any edge cases
 
@@ -176,7 +179,7 @@ template <typename E>
 stack_trace* get_free_element(linked_list<E>* list, element_index_t* element_index) {
     *element_index = list->free;
     TRY get_free_element_on_place(list, list->free)
-        FAIL("Can't detach list->free element!");
+        FAIL("Can't detach list->free (%d) element!", list->free);
     return SUCCESS();
 }
 
@@ -228,7 +231,7 @@ stack_trace* linked_list_insert_after(linked_list<E>* list, E value,
     // Check if prev_index is valid index of list
     TRY check_index(list, prev_index) FAIL("Illegal index passed!");
 
-    const double GROW = 2.0;
+    const double GROW = 2.0; // How much list grows when it runs out of space
 
     if (!free_elements_left(list))
         linked_list_resize(list, list->capacity * GROW);
@@ -455,13 +458,16 @@ void linked_list_destroy(linked_list<E> *list) {
 
 template <typename E>
 void print_text_dump(linked_list<E>* list) {
-    printf("+------------------------------+\n");
+    printf("==> free: %d\n", list->free);
+
+    printf("+-------------------------------------+\n");
     for (int i = 0; i <= list->capacity + 1; ++ i) {
         element<E>* elem = &list->elements[i];
-        printf("| %2d: (%02d) | (<-) %02d | (->) %02d | \n",
-               i, elem->element, elem->prev_index, elem->next_index);
+        printf("| %2d: (%02d) | (<-) %02d | (->) %02d | %s |\n",
+               i, elem->element, elem->prev_index,
+               elem->next_index, elem->is_free ? "free" : "busy");
     }
-    printf("+------------------------------+\n");
+    printf("+-------------------------------------+\n");
 }
 
 template <typename E>
@@ -536,7 +542,8 @@ void linked_list_create_graph(FILE* file, linked_list<E>* list) {
 
 const size_t MAX_TMP_NAME_SIZE = 128;
 
-inline char* linked_list_call_graphviz(linked_list<int>* list) {
+template <typename E>
+inline char* linked_list_call_graphviz(linked_list<E>* list) {
     char* graph_tmp_name = tmpnam(NULL);
 
     FILE* tmp = fopen(graph_tmp_name, "w");
