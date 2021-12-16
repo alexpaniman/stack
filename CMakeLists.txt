@@ -84,6 +84,9 @@ add_subdirectory(hash-table)
 # Safe alternatives to alloc function family, that uses trace
 add_subdirectory(safe-alloc)
 
+# Library for graph visualization
+add_subdirectory(graphviz)
+
 # ----------------------------- MAIN EXECUTABLE -----------------------------
 
 add_executable(stack main.cpp)
