@@ -22,7 +22,7 @@ struct element {
 template <typename E>
 struct linked_list {
     element<E>* elements;
-    size_t capacity;
+    size_t capacity, used;
 
     element_index_t free;
     bool is_linearized;
@@ -256,6 +256,8 @@ stack_trace* linked_list_insert_after(linked_list<E>* list, E value,
     if (actual_index != NULL)
         *actual_index = place_for_new_element;
 
+    ++ list->used; // This element was successfully added, let's update size
+
     return SUCCESS();
 }
 
@@ -309,6 +311,8 @@ stack_trace* linked_list_delete(linked_list<E>* list, element_index_t actual_ind
     TRY linked_list_unlink(list, actual_index) FAIL("Cannot unlink element!");
 
     add_free_element(list, actual_index);
+
+    -- list->used; // Element was successfully removed, let's correct size
 
     return SUCCESS();
 }

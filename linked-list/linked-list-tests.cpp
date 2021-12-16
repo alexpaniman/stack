@@ -40,21 +40,23 @@ void show(simple_stack<frame_t>* frames) {
 }
 
 
-#define ASSERT_CONTENT(list, type, ...)                                    \
-    do {                                                                   \
-        type __expected_content[] = { __VA_ARGS__ };                       \
-                                                                           \
-        element_index_t count = 0;                                         \
-        for (element<type>* current = linked_list_head(list);              \
-                current != linked_list_end (list);                         \
-                current =  linked_list_next(list, current))                \
-            ASSERT_EQUAL(__expected_content[count ++], current->element);  \
-    } while(0)
+#define ASSERT_CONTENT(list, type, ...)                                     \
+    do {                                                                    \
+        type __expected_content[] = { __VA_ARGS__ };                        \
+        ASSERT_EQUAL((int) (list)->used, (int) sizeof(__expected_content) / \
+                     (int) sizeof (*__expected_content));                   \
+                                                                            \
+        element_index_t count = 0;                                          \
+        for (element<type>* current = linked_list_head(list);               \
+                current != linked_list_end (list);                          \
+                current =  linked_list_next(list, current))                 \
+            ASSERT_EQUAL(__expected_content[count ++], current->element);   \
+    } while(false)
 
-#define ASSERT_LOGICAL_POSITION(list, type, index, expected_value)         \
-    do {                                                                   \
-        type __value = {}; linked_list_get_logical(list, index, &__value); \
-        ASSERT_EQUAL(__value, expected_value);                             \
+#define ASSERT_LOGICAL_POSITION(list, type, index, expected_value)          \
+    do {                                                                    \
+        type __value = {}; linked_list_get_logical(list, index, &__value);  \
+        ASSERT_EQUAL(__value, expected_value);                              \
     } while(false);
 
 
