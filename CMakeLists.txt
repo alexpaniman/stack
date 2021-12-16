@@ -93,6 +93,9 @@ add_subdirectory(graphviz)
 # Macro helper
 add_subdirectory(macro-utils)
 
+# Hash set data structure, implemented via hash table 
+add_subdirectory(hash-set)
+
 # ----------------------------- MAIN EXECUTABLE -----------------------------
 
 add_executable(stack main.cpp)
