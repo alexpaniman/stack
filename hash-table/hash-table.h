@@ -29,6 +29,7 @@ struct hash_table_bucket {
 template <typename K, typename V>
 struct hash_table {
     uint32_t (*key_hash_function) (K key);
+    bool (*key_equals_function) (K* first, K* second);
 
     hash_table_bucket* hash_table;
     linked_list<hash_table_pair<K, V>> values;
@@ -36,12 +37,19 @@ struct hash_table {
     size_t buckets_used, buckets_capacity;
 };
 
+template <typename K>
+bool hash_table_simple_key_equality(K* key_first, K* key_second) {
+    return key_first == key_second;
+}
+
 // TODO: Custom comparison for 
 template <typename K, typename V>
 stack_trace* hash_table_create(hash_table<K, V>* table,
                                uint32_t (*key_hash_function) (K key),
                                size_t bucket_capacity = 32,
-                               size_t value_list_size = 10) {
+                               size_t value_list_size = 10, 
+                               bool (*key_equals_function) (K* first, K* second) =
+                                    hash_table_simple_key_equality<K>) {
 
     // Bucket capacity should be power of two
     bucket_capacity = (size_t) pow(2, (int) ceil(log2(bucket_capacity)));
@@ -49,6 +57,9 @@ stack_trace* hash_table_create(hash_table<K, V>* table,
     *table = {
         // Comparator function
         .key_hash_function = key_hash_function,
+
+        // Function that checks for equality
+        .key_equals_function = key_equals_function,
 
         // Initialize hash table array and linked
         // list of values with zeroes.
