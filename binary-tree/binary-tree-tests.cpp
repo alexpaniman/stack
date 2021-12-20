@@ -1,11 +1,12 @@
 #include "binary-tree.h"
 #include "test-framework.h"
+#include <simple-stack.h>
 
 #define N(num, left, right) binary_tree_create(num, left, right)
 #define L(num) binary_tree_create_leaf(num)
 #define _ ((binary_tree<int>*) EMPTY_NODE<int>)
 
-TEST(test_binary_tree) {
+TEST(search_in_binary_tree) {
     binary_tree<int>* tree =
         N(0,
           N(1,
@@ -24,11 +25,22 @@ TEST(test_binary_tree) {
            )
          );
 
+    simple_stack<path_node<int>> path;
+    simple_stack_create(&path);
+
+    TEST_FINALIZER({
+        binary_tree_destroy(tree);
+        simple_stack_destruct(&path);
+    })
+
     ASSERT_EQUAL(binary_tree_search(tree, 12)->element, 12);
+    ASSERT_EQUAL(binary_tree_search(tree,  6)->element,  6);
 
-    ASSERT_EQUAL(binary_tree_search(tree, 6)->element, 6);
+    // Let's try to find path to the 13
+    binary_tree_search(tree, 13, &path);
+    ASSERT_EQUAL((int) path.next_index, 3);
 
-    binary_tree_destroy(tree);
+    CALL_TEST_FINALIZER();
 }
 
 
