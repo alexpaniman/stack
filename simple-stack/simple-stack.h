@@ -74,3 +74,9 @@ void simple_stack_destruct(simple_stack<E>* const stack) {
     free(stack->elements);
     stack->length = stack->next_index = 0;
 }
+
+#define SIMPLE_STACK_TRAVERSE(stack, type, current)                     \
+    for (type* current = (stack)->elements;                             \
+         current < (stack)->elements + (stack)->next_index; ++ current)
+
+#define SIMPLE_STACK_VALUE(element) (*element)
