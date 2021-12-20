@@ -38,7 +38,6 @@ void hash_set_rehash_keep_size(hash_set<E>* set) {
     hash_table_rehash_keep_size(set);
 }
 
-
 template <typename E>
 bool hash_set_contains(hash_set<E>* set, E value) {
     return hash_table_contains(&set->table, value);
@@ -48,3 +47,12 @@ bool hash_set_contains(hash_set<E>* set, E value) {
     HASH_TABLE_TRAVERSE(&(set)->table, value_type, dummy_t, current)
 
 #define SET_VALUE(current) KEY(current)
+
+template <typename E>
+bool hash_set_equals(hash_set<E>* first, hash_set<E>* second) {
+    HASH_SET_TRAVERSE(first, E, current)
+        if (!hash_set_contains(second, SET_VALUE(current)))
+            return false;
+
+    return true;
+}
