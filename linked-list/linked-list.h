@@ -495,11 +495,11 @@ void linked_list_create_graph(FILE* file, linked_list<E>* list) {
                    </table>>];)" "\n", i, i, el->element, el->prev_index, el->next_index);
     }
 
-    // fprintf(file, "\t\t edge [constraint = true, style = \"invis\"]; \n");
-    // for (int i = 1; i < (int) list->capacity; ++ i)
-    //     fprintf(file, "\t\t node_%03d -> node_%03d;\n", i, i + 1);
+    fprintf(file, "\t\t edge [constraint = true, style = \"invis\"]; \n");
+    for (int i = 1; i < (int) list->capacity; ++ i)
+        fprintf(file, "\t\t node_%03d -> node_%03d;\n", i, i + 1);
 
-    // fprintf(file, "\t\t edge [constraint = false, style = \"solid\"]; \n");
+    fprintf(file, "\t\t edge [constraint = false, style = \"solid\"]; \n");
     for (int i = 1; i <= (int) list->capacity + 1; ++ i) {
         const element<E>* el = &list->elements[i];
 

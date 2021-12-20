@@ -78,7 +78,8 @@ TEST(populate_linked_list_with_lots_of_elements) {
 
 TEST(populate_linked_list_with_different_values) {
     linked_list<int> list = {};
-    linked_list_create(&list, 10);
+    TRY linked_list_create(&list, 10)
+        ASSERT_SUCCESS();
 
     const int num_elements = 5;
 
