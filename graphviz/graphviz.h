@@ -135,7 +135,9 @@ void  digraph_write_to_file(FILE* file,  digraph* graph);
 
 char* digraph_render(digraph* graph);
 
-void digraph_destroy(digraph *graph);
+void digraph_destroy(digraph* graph);
+
+void digraph_render_and_destory(digraph* graph);
 
 
 #define NEW_GRAPH(...) ({                                                               \

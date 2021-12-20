@@ -1,5 +1,6 @@
 #include "graphviz.h"
 
+#include <cstdlib>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -298,4 +299,17 @@ char* digraph_render(digraph* graph) {
     system(dot_buffer);
 
     return image_tmp_name;
+}
+
+void digraph_render_and_destory(digraph* graph) {
+    char* name = digraph_render(graph);
+    char buffer[256] = {};
+
+    strcat(buffer, "sxiv ");
+    strcat(buffer, name);
+
+    system(buffer);
+
+    free(name), name = NULL;
+    digraph_destroy(graph);
 }
