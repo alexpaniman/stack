@@ -99,6 +99,9 @@ add_subdirectory(macro-utils)
 # Hash set data structure, implemented via hash table 
 add_subdirectory(hash-set)
 
+# Differentiator 
+add_subdirectory(differentiator)
+
 # ----------------------------- MAIN EXECUTABLE -----------------------------
 
 add_executable(stack main.cpp)
