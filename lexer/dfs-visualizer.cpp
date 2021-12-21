@@ -1,5 +1,7 @@
 #include "dfs-visualizer.h"
+#include "default-hash-functions.h"
 #include "safe-alloc.h"
+#include <cstdint>
 #include <simple-stack.h>
 
 void trie_vis_create_nodes(SUBGRAPH_CONTEXT, trie *graph, char name,
@@ -65,6 +67,10 @@ char* trie_vis_create_transition_description(linked_list<char>* list) {
     simple_stack_push(&string_builder, '\0');
 
     return string_builder.elements;
+}
+
+uint32_t trie_pointer_hash(trie* target_trie) {
+    return int_hash((int) (uintptr_t) target_trie);
 }
 
 void trie_vis_create_edges(SUBGRAPH_CONTEXT, trie* graph,

@@ -14,77 +14,75 @@
 #define CREATE_STATE(name )                                                  \
     trie *name = NULL; /* Can't wrap it in do/while, variable declaration */ \
     TRY trie_create(&name) ASSERT_SUCCESS();                                 \
-    
 
-TEST(visualizer_of_dfa_test_0) {
-    CREATE_STATE(state_a);
-    CREATE_STATE(state_b);
-
-    INSERT_CONNECTIONS(state_a, state_b, 'a', 'm');
-    INSERT_CONNECTIONS(state_b, state_a, 'a', 'b', 'c', 'd');
-
-    CREATE_STATE(state_c);
-    INSERT_CONNECTIONS(state_a, state_c, 'l');
-
-    INSERT_CONNECTIONS(state_c, state_c, 'u', 'q');
-
-    CREATE_STATE(state_d);
-    state_d->accept = 1;
-
-    INSERT_CONNECTIONS(state_c, state_d, 'v');
-
-    digraph graph = trie_vis_create_graph(state_a);
-
-    char* output_name = digraph_render(&graph);
-    printf("%s\n", output_name);
-
-    free(output_name), output_name = NULL;
-
-    trie_destroy(state_a);
-    digraph_destroy(&graph);
+void render_graph_and_print_file(trie* root) {
+    digraph graph = trie_vis_create_graph(root);
+    digraph_render_and_destory(&graph);
 }
 
+// TEST(visualizer_of_dfa_test_0) {
+//     CREATE_STATE(state_a);
+//     CREATE_STATE(state_b);
 
-TEST(visualizer_of_dfa_test_1) {
-    CREATE_STATE(state_a);
-    CREATE_STATE(state_b);
+//     INSERT_CONNECTIONS(state_a, state_b, 'a', 'm');
+//     INSERT_CONNECTIONS(state_b, state_a, 'a', 'b', 'c', 'd');
 
-    INSERT_CONNECTIONS(state_a, state_b, 'a', 'b');
+//     CREATE_STATE(state_c);
+//     INSERT_CONNECTIONS(state_a, state_c, 'l');
 
-    INSERT_CONNECTIONS(state_b, state_b, 'b');
+//     INSERT_CONNECTIONS(state_c, state_c, 'u', 'q');
 
-    CREATE_STATE(state_c);
-    state_c->accept = 1;
+//     CREATE_STATE(state_d);
+//     state_d->accept = 1;
 
-    INSERT_CONNECTIONS(state_b, state_c, 'a');
+//     INSERT_CONNECTIONS(state_c, state_d, 'v');
 
-    INSERT_CONNECTIONS(state_c, state_c, 'a');
+//     render_graph_and_print_file(state_a);
+// }
 
-    INSERT_CONNECTIONS(state_c, state_b, 'b');
 
-    digraph graph = trie_vis_create_graph(state_a);
+// TEST(visualizer_of_dfa_test_1) {
+//     CREATE_STATE(state_a);
+//     CREATE_STATE(state_b);
 
-    char* output_name = digraph_render(&graph);
-    printf("%s\n", output_name);
+//     INSERT_CONNECTIONS(state_a, state_b, 'a', 'b');
 
-    free(output_name), output_name = NULL;
+//     INSERT_CONNECTIONS(state_b, state_b, 'b');
 
-    trie_destroy(state_a);
-    digraph_destroy(&graph);
+//     CREATE_STATE(state_c);
+//     state_c->accept = 1;
+
+//     INSERT_CONNECTIONS(state_b, state_c, 'a');
+
+//     INSERT_CONNECTIONS(state_c, state_c, 'a');
+
+//     INSERT_CONNECTIONS(state_c, state_b, 'b');
+
+//     render_graph_and_print_file(state_a);
+// }
+
+TEST(test_2_visualizer) {
+    raw_trie* root = NULL;
+    raw_trie_create(&root);
+
+    regex_parser parser0 = { "[_fi]([123abc])", 0 };
+    regex_parse_expression(root, &parser0);
+
+    regex_parser parser1 = { "for", 0 };
+    regex_parse_expression(root, &parser1);
+
+    regex_parser parser2 = { "if", 0 };
+    regex_parse_expression(root, &parser2);
+
+    trie* result = NULL; trie_nfsm_to_dfsm(root, &result);
+    render_graph_and_print_file(result);
 }
 
 TEST(test_3_visualizer) {
-    trie* root = regex_parse("[abc][dfs]");
+    raw_trie* root = regex_parse("a(a)a(a)([abc]m)(aba)");
 
-    digraph graph = trie_vis_create_graph(root);
-
-    char* output_name = digraph_render(&graph);
-    printf("%s\n", output_name);
-
-    free(output_name), output_name = NULL;
-
-    trie_destroy(root);
-    digraph_destroy(&graph);
+    trie* result = NULL; trie_nfsm_to_dfsm(root, &result);
+    render_graph_and_print_file(result);
 }
 
 
