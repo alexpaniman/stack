@@ -1,6 +1,6 @@
 add_library(akinator STATIC akinator.cpp)
 
-target_link_libraries(akinator PUBLIC binary-tree lexer textlib trace)
+target_link_libraries(akinator PUBLIC binary-tree lexer textlib trace simple-stack)
 
 target_include_directories(
   akinator PUBLIC
