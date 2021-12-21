@@ -34,6 +34,11 @@ bool hash_set_insert(hash_set<E>* set, E value) {
 }
 
 template <typename E>
+bool hash_set_delete(hash_set<E>* set, E key) {
+    return hash_table_delete(&set->table, key);
+}
+
+template <typename E>
 void hash_set_rehash_keep_size(hash_set<E>* set) {
     hash_table_rehash_keep_size(set);
 }

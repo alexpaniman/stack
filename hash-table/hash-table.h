@@ -39,10 +39,9 @@ struct hash_table {
 
 template <typename K>
 bool hash_table_simple_key_equality(K* key_first, K* key_second) {
-    return key_first == key_second;
+    return *key_first == *key_second;
 }
 
-// TODO: Custom comparison for 
 template <typename K, typename V>
 stack_trace* hash_table_create(hash_table<K, V>* table,
                                uint32_t (*key_hash_function) (K key),
@@ -120,7 +119,7 @@ element_index_t __hash_table_lookup_index(hash_table<K, V>* table, K key,
             linked_list_get_pointer(&table->values, bucket->value_index);
 
         for (size_t index = 0; index < bucket->size; ++ index) {
-            if (current->element.key == key)
+            if (table->key_equals_function(&current->element.key, &key))
                 return linked_list_get_index(&table->values, current);
 
             current = linked_list_next(&table->values, current);
@@ -148,7 +147,7 @@ V* hash_table_lookup(hash_table<K, V>* table, K key) {
 #define KEY(  current) ((current)->element.key)
 #define VALUE(current) ((current)->element.value) 
 
-template<typename K, typename V>
+template <typename K, typename V>
 void hash_table_rehash(hash_table<K, V>* table,
                        const size_t new_bucket_capacity,
                        const size_t new_values_capacity) {
@@ -156,7 +155,8 @@ void hash_table_rehash(hash_table<K, V>* table,
     hash_table<K, V> new_table;
     hash_table_create(&new_table, table->key_hash_function,
                       new_bucket_capacity,
-                      new_values_capacity);
+                      new_values_capacity,
+                      table->key_equals_function);
 
     HASH_TABLE_TRAVERSE(table, K, V, current)
         hash_table_insert(&new_table, KEY(current), VALUE(current));
@@ -165,19 +165,35 @@ void hash_table_rehash(hash_table<K, V>* table,
     *table = new_table; // Replace hash_table with a new one
 }
 
-template<typename K, typename V>
+template <typename K, typename V>
 void hash_table_rehash_keep_size(hash_table<K, V>* table) {
     hash_table_rehash(table, table->buckets_capacity, table->values.capacity);
 }
 
-// TODO: remove
+template <typename K, typename V>
+bool hash_table_delete(hash_table<K, V>* table, K key) {
+    hash_table_bucket* bucket = NULL;
+    element_index_t index =
+        __hash_table_lookup_index(table, key, &bucket);
 
-template<typename K, typename V>
+    if (index == linked_list_end_index)
+        return false;
+
+    TRY linked_list_delete(&table->values, index)
+        THROW("Value deletion failed!");
+
+    -- bucket->size; // Since we found element
+    // Bucket should be bigger than 1 in any case
+
+    return true; // Deletion succeeded
+}
+
+template <typename K, typename V>
 bool hash_table_contains(hash_table<K, V>* table, K key) {
     return __hash_table_lookup_index(table, key) != linked_list_end_index;
 }
 
-template<typename K, typename V>
+template <typename K, typename V>
 bool hash_table_insert(hash_table<K, V>* table, K key, V value) {
     hash_table_bucket* bucket;
     if (__hash_table_lookup_index(table, key, &bucket) != linked_list_end_index)
