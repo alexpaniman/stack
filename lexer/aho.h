@@ -2,7 +2,6 @@
 
 #include "hash-table.h"
 #include "safe-alloc.h"
-#include "test-framework.h"
 #include "trace.h"
 #include "graphviz.h"
 #include "hash-set.h"
