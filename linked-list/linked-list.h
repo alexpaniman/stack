@@ -83,7 +83,7 @@ inline element_index_t linked_list_get_index(linked_list<E>* list,
 
 
 template <typename E>
-stack_trace* linked_list_create(linked_list<E>* list, const size_t capacity) {
+stack_trace* linked_list_create(linked_list<E>* list, const size_t capacity = 10) {
     element<E>* new_space = (element<E>*)
         calloc(capacity + 2 /* For two terminal nodes */, sizeof(*new_space));
 
